@@ -3,6 +3,9 @@ defmodule Edenex.XML do
   Record.defrecord :xmlElement,
                    Record.extract(:xmlElement,
                                   from_lib: "xmerl/include/xmerl.hrl")
+  Record.defrecord :xmlAttribute,
+                   Record.extract(:xmlAttribute,
+                                  from_lib: "xmerl/include/xmerl.hrl")
   Record.defrecord :xmlText,
                    Record.extract(:xmlText, from_lib:
                                   "xmerl/include/xmerl.hrl")
@@ -25,7 +28,7 @@ defmodule Edenex.XML do
   keys needed (pulled from the Edenex module), then process the XML response
   to return a list of hashes representing each row returned from the call.
   """
-  defp make_call_with_auth(endpoint, args \\ %{}) do
+  def make_call_with_auth(endpoint, args \\ %{}) do
     endpoint
     |> make_call(Dict.merge(args, %{ keyID: Edenex.key_id,
                                      vCode: Edenex.verification_code }))
@@ -36,7 +39,7 @@ defmodule Edenex.XML do
   Make call to given endpoint, with given args, then process the XML response
   to return a list of hashes representing each row returned from the call.
   """
-  defp make_call(endpoint, args \\ %{}) do
+  def make_call(endpoint, args \\ %{}) do
     "#{@url}/#{endpoint}.xml.aspx"
     |> HTTPoison.post({:form, Enum.map(args, &(&1))}, @user_agent)
     |> process_response
@@ -45,10 +48,33 @@ defmodule Edenex.XML do
   @doc """
   Process an HTTPoison response, parsing the XML to return the resulting rows.
   """
-  defp process_response({:ok, response}) do
+  def process_response({:ok, response}) do
     IO.puts(response.body)
     { xml, _rest } = :xmerl_scan.string(to_char_list(response.body))
-    rowset_elements = :xmerl_xpath.string('//result/rowset', xml)
+    # Pull the list of columns from the rowset's attributes, split on comma.
+    List.first(:xmerl_xpath.string('//rowset', xml)) |> process_rowset
+  end
+
+  def process_rowset(rowset) do
+    # Iterate over all its rows; recurse if a row contains another rowset.
+    rowset |> xmlElement(:content)
+           |> Enum.filter(fn(x) -> xmlElement(x, :name) == :row end)
+           |> Enum.map(fn(x) -> extract_from_row(x) end)
+  end
+
+  def extract_from_row(element) do
+    attrs = xmlElement(element, :attributes)
+    row_map = attrs
+      |> Enum.map(fn(x) -> { xmlAttribute(x, :name),
+                             xmlAttribute(x, :value) } end)
+      |> Enum.into(%{})
+    children = Enum.filter(xmlElement(element, :content),
+                           fn(x) -> xmlElement(x, :name) == :rowset end)
+    if Enum.count(children) > 0 do
+      row_map = Map.put_new(row_map, :nested,
+                            Enum.map(children, fn(x) -> process_rowset(x) end))
+    end
+    row_map
   end
 
 end

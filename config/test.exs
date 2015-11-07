@@ -18,4 +18,3 @@ use Mix.Config
 config :edenex, eve_key_id: "1234567890"
 config :edenex, verification_code: "ABC...789"
 
-import_config "#{Mix.env}.secret.exs"
