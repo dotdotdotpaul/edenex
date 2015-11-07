@@ -1,8 +1,14 @@
 # Edenex
 
-**TODO: Add description**
+Edenex is an Elixir library (and a simple example app) that can interface
+with the EVE Online APIs.
+
+** NOTE ** This project is me teaching myself Elixir, so don't expect it to
+be perfect anytime soon.  :)
 
 ## Installation
+
+** TODO **
 
 If [available in Hex](https://hex.pm/docs/publish), the package can be installed as:
 
